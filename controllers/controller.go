@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jinzhu/gorm"
+
 	"github.com/sajallimbu/go_securing_api/utils"
 
 	"github.com/gorilla/mux"
@@ -75,22 +77,22 @@ func (uc UserController) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 // FindUser ... our authentication function that takes the user email and password then returns a response
-func FindUser(email, password string) map[string]interface{} {
+func FindUser(email, password string) *models.TokenResponse {
 	user := &models.User{}
 
 	// Query the database for matching email address and store the matched result in user
 	if err := db.Where("Email = ?", email).First(user).Error; err != nil {
-		var resp = map[string]interface{}{"status": false, "message": "Email address not found"}
+		var resp = &models.TokenResponse{Success: false, ResponseCode: http.StatusNotFound, Message: "Email address not found"}
 		return resp
 	}
 
 	// Add an expiry window to the JWT token
-	expiresAt := time.Now().Add(time.Minute * 100000).Unix()
+	expiresAt := time.Now().Add(time.Minute * 15).Unix()
 
 	// Compare the hash stored in the database with the password inputted by the user
 	errf := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if errf != nil && errf == bcrypt.ErrMismatchedHashAndPassword { //Password does not match
-		var resp = map[string]interface{}{"status": false, "message": "Incorrect password"}
+		var resp = &models.TokenResponse{Success: false, ResponseCode: http.StatusNotFound, Message: "Incorrect password"}
 		return resp
 	}
 
@@ -113,10 +115,7 @@ func FindUser(email, password string) map[string]interface{} {
 		fmt.Println(err)
 	}
 
-	var resp = map[string]interface{}{"status": false, "message": "logged in"}
-	// Add a couple of new key value pair in resp
-	resp["token"] = tokenString
-	resp["user"] = user
+	var resp = &models.TokenResponse{Success: true, ResponseCode: http.StatusOK, Message: "logged in", Token: tokenString}
 
 	return resp
 }
@@ -124,7 +123,10 @@ func FindUser(email, password string) map[string]interface{} {
 // FetchUsers ... function that returns all users
 func (uc UserController) FetchUsers(w http.ResponseWriter, r *http.Request) {
 	var users []models.User
-	db.Find(&users)
+	if err := db.Find(&users); err != nil {
+		json.NewEncoder(w).Encode(&models.Response{Success: false, ResponseCode: http.StatusNotFound, Message: "No user records in the database"})
+		return
+	}
 	json.NewEncoder(w).Encode(&users)
 }
 
@@ -133,7 +135,12 @@ func (uc UserController) GetUser(w http.ResponseWriter, r *http.Request) {
 	user := &models.User{}
 	params := mux.Vars(r)
 	var id = params["id"]
-	db.First(&user, id)
+
+	// Check for record not found error
+	if err := db.First(&user, id).Error; gorm.IsRecordNotFoundError(err) {
+		json.NewEncoder(w).Encode(&models.Response{Success: false, ResponseCode: http.StatusNotFound, Message: "The user does not exist"})
+		return
+	}
 	json.NewEncoder(w).Encode(&user)
 }
 
@@ -144,8 +151,13 @@ func (uc UserController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	var id = params["id"]
 	db.First(&user, id)
 	json.NewDecoder(r.Body).Decode(&user)
-	db.Save(&user)
-	json.NewEncoder(w).Encode(&user)
+	if err := db.Save(&user).Error; err != nil {
+		json.NewEncoder(w).Encode(&models.Response{Success: false, ResponseCode: http.StatusBadRequest, Message: "User update failed"})
+		return
+	}
+	var resp = map[string]interface{}{"status": true, "responseCode": http.StatusOK, "message": "User update success"}
+	resp["data"] = user
+	json.NewEncoder(w).Encode(resp)
 }
 
 // DeleteUser ... function that deletes a user
@@ -154,6 +166,9 @@ func (uc UserController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	var id = params["id"]
 	var user models.User
 	db.First(&user, id)
-	db.Delete(&user)
-	json.NewEncoder(w).Encode("User deleted")
+	if err := db.Unscoped().Delete(&user); err != nil {
+		json.NewEncoder(w).Encode(&models.Response{Success: false, ResponseCode: http.StatusBadRequest, Message: "User deletion failed"})
+		return
+	}
+	json.NewEncoder(w).Encode(&models.Response{Success: true, ResponseCode: http.StatusOK, Message: "User deleted successfully"})
 }

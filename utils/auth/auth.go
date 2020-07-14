@@ -16,7 +16,7 @@ type Exception struct {
 	Message      string
 }
 
-//JwtVerify ... our middleware that checks if the JWT token is valid and if true give access to the api handlers
+//JwtVerify ... our middleware that checks if the JWT token is valid and if true gives access to the api handlers
 func JwtVerify(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var header = r.Header.Get("Authorization") // Grab the token from the user request
