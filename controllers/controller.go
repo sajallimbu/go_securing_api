@@ -123,7 +123,7 @@ func FindUser(email, password string) *models.TokenResponse {
 // FetchUsers ... function that returns all users
 func (uc UserController) FetchUsers(w http.ResponseWriter, r *http.Request) {
 	var users []models.User
-	if err := db.Find(&users); err != nil {
+	if err := db.Find(&users).Error; err != nil {
 		json.NewEncoder(w).Encode(&models.Response{Success: false, ResponseCode: http.StatusNotFound, Message: "No user records in the database"})
 		return
 	}
@@ -166,7 +166,7 @@ func (uc UserController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	var id = params["id"]
 	var user models.User
 	db.First(&user, id)
-	if err := db.Unscoped().Delete(&user); err != nil {
+	if err := db.Unscoped().Delete(&user).Error; err != nil {
 		json.NewEncoder(w).Encode(&models.Response{Success: false, ResponseCode: http.StatusBadRequest, Message: "User deletion failed"})
 		return
 	}

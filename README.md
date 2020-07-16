@@ -4,4 +4,6 @@
 
 #### It'll serve the server at localhost:8080 
 
-#### Routes like /api, /api/login, /api/register doesnt need any authentication but /auth/user/... does 
+#### Routes like /api, /api/login, /api/register doesnt need any authentication but /user/... does 
+
+### CompileDaemon -command="./go_securing_api -my-options"

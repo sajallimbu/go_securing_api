@@ -4,17 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/sajallimbu/go_securing_api/models"
 )
-
-// Exception ... our exception message struct
-type Exception struct {
-	ResponseCode int
-	Message      string
-}
 
 //JwtVerify ... our middleware that checks if the JWT token is valid and if true gives access to the api handlers
 func JwtVerify(next http.Handler) http.Handler {
@@ -25,7 +20,7 @@ func JwtVerify(next http.Handler) http.Handler {
 		if header == "" {
 			// Token is missing. Return with error code 403 not authorized
 			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(Exception{ResponseCode: http.StatusNotFound, Message: "Missing authentication token"})
+			json.NewEncoder(w).Encode(&models.Response{Success: false, ResponseCode: http.StatusForbidden, Message: "Missing authentication token"})
 			return
 		}
 
@@ -35,20 +30,22 @@ func JwtVerify(next http.Handler) http.Handler {
 		splitHeader := strings.Split(header, " ")
 		if len(splitHeader) != 2 {
 			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(Exception{Message: "Invalid/Malformed auth token"})
+			json.NewEncoder(w).Encode(&models.Response{Success: false, ResponseCode: http.StatusForbidden, Message: "Invalid/Malformed authentication token"})
 			return
 		}
 
 		tokenPart := splitHeader[1]
 		tk := &models.Token{}
 
+		secret := os.Getenv("jwtSecret")
+
 		_, err := jwt.ParseWithClaims(tokenPart, tk, func(token *jwt.Token) (interface{}, error) {
-			return []byte("secret"), nil
+			return []byte(secret), nil
 		})
 
 		if err != nil {
 			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(Exception{Message: err.Error()})
+			json.NewEncoder(w).Encode(&models.Response{Success: false, ResponseCode: http.StatusForbidden, Message: "Invalid authentication token"})
 			return
 		}
 
