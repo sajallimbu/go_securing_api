@@ -87,7 +87,7 @@ func FindUser(email, password string) *models.TokenResponse {
 	}
 
 	// Add an expiry window to the JWT token
-	expiresAt := time.Now().Add(time.Minute * 15).Unix()
+	expiresAt := time.Now().Add(time.Minute * 24).Unix()
 
 	// Compare the hash stored in the database with the password inputted by the user
 	errf := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
